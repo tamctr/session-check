@@ -29,7 +29,8 @@ textarea{width:100%;min-height:64px;margin-top:10px;background:#161b20;color:#ec
 <div class="seg" id="game"><button class="on">Hold'em</button><button>PLO</button></div>
 <div class="seg" id="fmt"><button class="on">Cash</button><button>Tournament</button></div>
 <svg id="radar" viewBox="-40 0 400 290"></svg>
-<div class="total">Average <b id="avg">70</b></div>
+<div class="total">Total <b id="tot">350</b><span style="color:#96a2ae">/500</span> &nbsp;·&nbsp; Average <b id="avg">70</b></div>
+<div class="row" style="grid-template-columns:96px 1fr"><label for="when">Time</label><input id="when" type="datetime-local" style="background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:8px;padding:8px;font-size:15px;font-family:inherit;width:100%"></div>
 <div id="rows"></div>
 <textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
 <div class="btns"><button id="reset">Reset</button><button id="copy">Copy for chat</button></div>
@@ -52,7 +53,7 @@ function draw(){
   const avg=Math.round(st.v.reduce((a,b)=>a+b,0)/N),col=color(avg);
   s+=`<polygon points="${st.v.map((v,i)=>pt(i,R*v/100).join(",")).join(" ")}" fill="${col}33" stroke="${col}" stroke-width="2"/>`;
   st.v.forEach((v,i)=>{const[x,y]=pt(i,R*v/100);s+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${col}"/>`});
-  svg.innerHTML=s;document.getElementById("avg").textContent=avg;
+  svg.innerHTML=s;document.getElementById("avg").textContent=avg;document.getElementById("tot").textContent=st.v.reduce((a,b)=>a+b,0);
   localStorage.setItem(KEY,JSON.stringify(st));
 }
 AX.forEach((n,i)=>{
@@ -66,15 +67,19 @@ function seg(id,key){const el=document.getElementById(id);
   const sync=()=>el.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.textContent===st[key]));
   el.addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){st[key]=e.target.textContent;sync();draw()}});sync()}
 seg("game","game");seg("fmt","fmt");
+const nowLocal=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
+const when=document.getElementById("when");when.value=st.when||nowLocal();st.when=when.value;
+when.addEventListener("input",()=>{st.when=when.value;draw()});
+const fmtWhen=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"})};
 const note=document.getElementById("note");note.value=st.note;note.addEventListener("input",()=>{st.note=note.value;draw()});
 function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
 document.getElementById("copy").addEventListener("click",async()=>{
-  const txt=`${st.game} · ${st.fmt}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+  const tot=st.v.reduce((a,b)=>a+b,0);const txt=`${st.game} · ${st.fmt}\n${fmtWhen(st.when)}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+`\nTotal: ${tot}/500 (avg ${Math.round(tot/5)})`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
   try{await navigator.clipboard.writeText(txt);toast("Copied")}
   catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();
     try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed. Long-press to copy.")}t.remove()}
 });
-document.getElementById("reset").addEventListener("click",()=>{st.v=AX.map(()=>70);st.note="";note.value="";
+document.getElementById("reset").addEventListener("click",()=>{st.v=AX.map(()=>70);st.note="";note.value="";st.when=nowLocal();when.value=st.when;
   AX.forEach((_,i)=>{document.getElementById("s"+i).value=70;document.getElementById("o"+i).textContent=70});draw()});
 draw();
 </script></body></html>
