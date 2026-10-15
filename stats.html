@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Stat Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c0e;color:#ecf0f4;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;font-size:16px;padding:16px 16px calc(24px + env(safe-area-inset-bottom));max-width:480px;margin:auto}
+h1{font-size:20px;margin-bottom:4px}a{color:#5ad2ff;font-size:14px}
+.top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.seg{display:flex;background:#161b20;border-radius:10px;padding:3px;margin-bottom:8px}
+.seg button{flex:1;border:0;background:none;color:#96a2ae;font-weight:600;font-size:15px;font-family:inherit;padding:9px;border-radius:8px}
+.seg button.on{background:#5ad2ff;color:#04121a}
+#when{width:100%;background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:8px;padding:8px;font-size:15px;font-family:inherit;margin-bottom:10px}
+.score{background:#161b20;border-radius:12px;padding:12px;margin-bottom:12px;text-align:center}
+.score b{font-size:28px}.score .sub{color:#96a2ae;font-size:13px;margin-top:4px;line-height:1.4}
+.m{padding:9px 0;border-bottom:1px solid #1c2228}
+.mh{display:flex;justify-content:space-between;align-items:baseline;font-size:14px}
+.mh .t{color:#96a2ae;font-size:12px}
+.val{font-weight:700;font-family:ui-monospace,monospace;font-size:15px}
+.bar{position:relative;height:22px;margin-top:6px}
+.band{position:absolute;top:9px;height:4px;background:#2a333b;left:0;right:0;border-radius:2px}
+.ok{position:absolute;top:7px;height:8px;background:#1f6b4a;border-radius:3px}
+input[type=range]{-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:22px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--c,#5ad2ff)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--c,#5ad2ff);border:0}
+input[type=range]::-moz-range-track{background:transparent}
+textarea{width:100%;min-height:60px;margin-top:12px;background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:10px;padding:10px;font-size:15px;font-family:inherit}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btns button{flex:1;border:0;border-radius:10px;padding:13px;font-weight:600;font-size:16px;font-family:inherit}
+#copy{background:#5ad2ff;color:#04121a}#reset{background:#161b20;color:#96a2ae}
+#toast{text-align:center;color:#5ad2ff;font-size:14px;height:20px;margin-top:8px}
+.foot{color:#6b7782;font-size:12px;margin-top:10px;line-height:1.4}
+</style></head><body>
+<div class="top"><h1>Stat check</h1><a href="./">Mental check →</a></div>
+<div class="seg" id="game"><button>PLO5</button><button>Hold'em</button></div>
+<input id="when" type="datetime-local">
+<div class="score"><div><b id="inr">0/0</b> in target</div><div class="sub" id="miss"></div></div>
+<div id="list"></div>
+<textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
+<div class="btns"><button id="reset">Reset to targets</button><button id="copy">Copy for chat</button></div>
+<div id="toast"></div>
+<div class="foot">Target ranges are rough live guides, not solver numbers. Judge them over many sessions, not one.</div>
+<script>
+const SETS={
+ "PLO5":[
+  ["VPIP","% hands you put money in",0,60,25,35],
+  ["PFR","% hands you raise preflop",0,40,15,22],
+  ["3-bet","% you 3-bet when you can",0,25,6,10],
+  ["WTSD","% of flops you take to showdown",0,60,28,33],
+  ["Non-nut stack-offs","times all-in without nuts/nut draw",0,10,0,0]],
+ "Hold'em":[
+  ["VPIP","% hands you put money in",0,50,15,20],
+  ["PFR","% hands you raise preflop",0,40,12,17],
+  ["VPIP–PFR gap","points between the two",0,25,0,4],
+  ["3-bet","% you 3-bet when you can",0,20,5,8],
+  ["Fold to 3-bet","% you fold after being 3-bet",0,100,45,60],
+  ["Flop c-bet","% you bet flop as preflop raiser",0,100,50,65],
+  ["WTSD","% of flops you take to showdown",0,60,25,30],
+  ["W$SD","% you win at showdown",0,100,50,55],
+  ["WWSF","% you win after seeing flop",0,100,45,50]]
+};
+const KEY="statCheck.v1";
+const nowLocal=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
+const mid=m=>Math.round((m[4]+m[5])/2);
+const fresh=()=>({game:"PLO5",when:nowLocal(),note:"",v:{"PLO5":SETS.PLO5.map(mid),"Hold'em":SETS["Hold'em"].map(mid)}});
+let st=fresh();try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.v)st=s}catch(e){}
+const list=document.getElementById("list");
+const status=(m,v)=>v<m[4]?"low":v>m[5]?"high":"ok";
+const col=s=>s==="ok"?"#3ddc97":"#ff6464";
+function build(){
+ list.innerHTML="";const S=SETS[st.game];
+ S.forEach((m,i)=>{const[n,t,lo,hi,a,b]=m;const pct=x=>(x-lo)/(hi-lo)*100;
+  const d=document.createElement("div");d.className="m";
+  d.innerHTML=`<div class="mh"><span>${n} <span class="t">target ${a===b?a:a+"–"+b}</span></span><span class="val" id="v${i}"></span></div>
+  <div class="t" style="color:#6b7782;font-size:12px">${t}</div>
+  <div class="bar"><div class="band"></div><div class="ok" style="left:${pct(a)}%;width:max(6px,${pct(b)-pct(a)}%)"></div>
+  <input type="range" min="${lo}" max="${hi}" step="1" value="${st.v[st.game][i]}" id="s${i}"></div>`;
+  list.appendChild(d);
+  d.querySelector("input").addEventListener("input",e=>{st.v[st.game][i]=+e.target.value;update()});
+ });update();
+}
+function update(){
+ const S=SETS[st.game];let ok=0,miss=[];
+ S.forEach((m,i)=>{const v=st.v[st.game][i],s=status(m,v);if(s==="ok")ok++;else miss.push(`${m[0]} ${s} (${v})`);
+  const el=document.getElementById("v"+i);el.textContent=v+(s==="ok"?" ✓":s==="low"?" ↓":" ↑");el.style.color=col(s);
+  document.getElementById("s"+i).style.setProperty("--c",col(s))});
+ const r=document.getElementById("inr");r.textContent=`${ok}/${S.length}`;r.style.color=ok===S.length?"#3ddc97":ok>=S.length-1?"#ffbe50":"#ff6464";
+ document.getElementById("miss").textContent=miss.length?"Off target: "+miss.join(", "):"Everything in target.";
+ localStorage.setItem(KEY,JSON.stringify(st));
+}
+const g=document.getElementById("game");
+const syncG=()=>g.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.textContent===st.game));
+g.addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){st.game=e.target.textContent;syncG();build()}});syncG();
+const when=document.getElementById("when");when.value=st.when||nowLocal();when.addEventListener("input",()=>{st.when=when.value;update()});
+const note=document.getElementById("note");note.value=st.note||"";note.addEventListener("input",()=>{st.note=note.value;update()});
+const fmtWhen=v=>v?new Date(v).toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}):"";
+function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
+document.getElementById("copy").addEventListener("click",async()=>{
+ const S=SETS[st.game];let ok=0;
+ const lines=S.map((m,i)=>{const v=st.v[st.game][i],s=status(m,v);if(s==="ok")ok++;return `${m[0]}: ${v} (target ${m[4]===m[5]?m[4]:m[4]+"–"+m[5]})${s==="ok"?" ✓":s==="low"?" LOW":" HIGH"}`});
+ const txt=`${st.game} cash stats\n${fmtWhen(st.when)}\n${lines.join("\n")}\nIn target: ${ok}/${S.length}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+ try{await navigator.clipboard.writeText(txt);toast("Copied")}catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed")}t.remove()}
+});
+document.getElementById("reset").addEventListener("click",()=>{st.v[st.game]=SETS[st.game].map(mid);st.when=nowLocal();when.value=st.when;build()});
+build();
+</script></body></html>
