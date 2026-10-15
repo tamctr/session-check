@@ -34,25 +34,27 @@ textarea{width:100%;min-height:60px;margin-top:12px;background:#161b20;color:#ec
 <div class="top"><h1>Stat check</h1><a href="./">Mental check →</a></div>
 <div class="seg" id="game"><button>PLO5</button><button>Hold'em</button></div>
 <input id="when" type="datetime-local">
+<div class="m" style="border:0;padding-top:0"><div class="mh"><span>Players <span class="t">how many handed</span></span><span class="val" id="pv"></span></div>
+<div class="bar"><div class="band"></div><input type="range" min="2" max="9" step="1" id="players"></div></div>
 <div class="score"><div><b id="inr">0/0</b> in target</div><div class="sub" id="miss"></div></div>
 <div id="list"></div>
 <textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
 <div class="btns"><button id="reset">Reset to targets</button><button id="copy">Copy for chat</button></div>
 <div id="toast"></div>
-<div class="foot">Target ranges are rough live guides, not solver numbers. Judge them over many sessions, not one.</div>
+<div class="foot">Target ranges are rough live guides, not solver numbers. VPIP, PFR and 3-bet targets widen roughly as the table gets shorter. Judge them over many sessions, not one.</div>
 <script>
 const SETS={
  "PLO5":[
-  ["VPIP","% hands you put money in",0,60,25,35],
-  ["PFR","% hands you raise preflop",0,40,15,22],
-  ["3-bet","% you 3-bet when you can",0,25,6,10],
+  ["VPIP","% hands you put money in",0,100,25,35,1],
+  ["PFR","% hands you raise preflop",0,100,15,22,1],
+  ["3-bet","% you 3-bet when you can",0,40,6,10,1],
   ["WTSD","% of flops you take to showdown",0,60,28,33],
   ["Non-nut stack-offs","times all-in without nuts/nut draw",0,10,0,0]],
  "Hold'em":[
-  ["VPIP","% hands you put money in",0,50,15,20],
-  ["PFR","% hands you raise preflop",0,40,12,17],
+  ["VPIP","% hands you put money in",0,100,15,20,1],
+  ["PFR","% hands you raise preflop",0,100,12,17,1],
   ["VPIP–PFR gap","points between the two",0,25,0,4],
-  ["3-bet","% you 3-bet when you can",0,20,5,8],
+  ["3-bet","% you 3-bet when you can",0,40,5,8,1],
   ["Fold to 3-bet","% you fold after being 3-bet",0,100,45,60],
   ["Flop c-bet","% you bet flop as preflop raiser",0,100,50,65],
   ["WTSD","% of flops you take to showdown",0,60,25,30],
@@ -60,16 +62,21 @@ const SETS={
   ["WWSF","% you win after seeing flop",0,100,45,50]]
 };
 const KEY="statCheck.v1";
+let CUR={game:"PLO5",players:8};
+const MULT={9:1,8:1.06,7:1.15,6:1.3,5:1.45,4:1.65,3:2,2:3};
+const BASE={"PLO5":1.1,"Hold'em":1};
+function tgt(m){if(!m[6])return[m[4],m[5]];const g=(typeof st!=="undefined"&&st)?st:CUR;const k=MULT[g.players||(g.game==="PLO5"?8:9)]/BASE[g.game];
+ return[Math.min(m[3],Math.round(m[4]*k)),Math.min(m[3],Math.round(m[5]*k))]}
 const nowLocal=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
-const mid=m=>Math.round((m[4]+m[5])/2);
-const fresh=()=>({game:"PLO5",when:nowLocal(),note:"",v:{"PLO5":SETS.PLO5.map(mid),"Hold'em":SETS["Hold'em"].map(mid)}});
-let st=fresh();try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.v)st=s}catch(e){}
+const mid=m=>{const[a,b]=tgt(m);return Math.round((a+b)/2)};
+const fresh=()=>{CUR={game:"PLO5",players:8};const p=SETS.PLO5.map(mid);CUR={game:"Hold'em",players:9};const h=SETS["Hold'em"].map(mid);return{game:"PLO5",players:8,when:nowLocal(),note:"",v:{"PLO5":p,"Hold'em":h}}};
+var st=null;st=fresh();try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.v)st=s}catch(e){}
 const list=document.getElementById("list");
-const status=(m,v)=>v<m[4]?"low":v>m[5]?"high":"ok";
+const status=(m,v)=>{const[a,b]=tgt(m);return v<a?"low":v>b?"high":"ok"};
 const col=s=>s==="ok"?"#3ddc97":"#ff6464";
 function build(){
  list.innerHTML="";const S=SETS[st.game];
- S.forEach((m,i)=>{const[n,t,lo,hi,a,b]=m;const pct=x=>(x-lo)/(hi-lo)*100;
+ S.forEach((m,i)=>{const[n,t,lo,hi]=m;const[a,b]=tgt(m);const pct=x=>(x-lo)/(hi-lo)*100;
   const d=document.createElement("div");d.className="m";
   d.innerHTML=`<div class="mh"><span>${n} <span class="t">target ${a===b?a:a+"–"+b}</span></span><span class="val" id="v${i}"></span></div>
   <div class="t" style="color:#6b7782;font-size:12px">${t}</div>
@@ -88,6 +95,10 @@ function update(){
  document.getElementById("miss").textContent=miss.length?"Off target: "+miss.join(", "):"Everything in target.";
  localStorage.setItem(KEY,JSON.stringify(st));
 }
+if(!st.players)st.players=st.game==="PLO5"?8:9;
+const pl=document.getElementById("players"),pv=document.getElementById("pv");
+const syncP=()=>{pl.value=st.players;pv.textContent=st.players+"-handed"};syncP();
+pl.addEventListener("input",()=>{st.players=+pl.value;syncP();build()});
 const g=document.getElementById("game");
 const syncG=()=>g.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.textContent===st.game));
 g.addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){st.game=e.target.textContent;syncG();build()}});syncG();
@@ -97,8 +108,8 @@ const fmtWhen=v=>v?new Date(v).toLocaleString(undefined,{weekday:"short",day:"nu
 function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
 document.getElementById("copy").addEventListener("click",async()=>{
  const S=SETS[st.game];let ok=0;
- const lines=S.map((m,i)=>{const v=st.v[st.game][i],s=status(m,v);if(s==="ok")ok++;return `${m[0]}: ${v} (target ${m[4]===m[5]?m[4]:m[4]+"–"+m[5]})${s==="ok"?" ✓":s==="low"?" LOW":" HIGH"}`});
- const txt=`${st.game} cash stats\n${fmtWhen(st.when)}\n${lines.join("\n")}\nIn target: ${ok}/${S.length}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+ const lines=S.map((m,i)=>{const v=st.v[st.game][i],s=status(m,v);if(s==="ok")ok++;return `${m[0]}: ${v} (target ${tgt(m)[0]===tgt(m)[1]?tgt(m)[0]:tgt(m).join("–")})${s==="ok"?" ✓":s==="low"?" LOW":" HIGH"}`});
+ const txt=`${st.game} cash stats · ${st.players}-handed\n${fmtWhen(st.when)}\n${lines.join("\n")}\nIn target: ${ok}/${S.length}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
  try{await navigator.clipboard.writeText(txt);toast("Copied")}catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed")}t.remove()}
 });
 document.getElementById("reset").addEventListener("click",()=>{st.v[st.game]=SETS[st.game].map(mid);st.when=nowLocal();when.value=st.when;build()});
