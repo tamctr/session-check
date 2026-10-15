@@ -36,6 +36,8 @@ textarea{width:100%;min-height:60px;margin-top:12px;background:#161b20;color:#ec
 <input id="when" type="datetime-local">
 <div class="m" style="border:0;padding-top:0"><div class="mh"><span>Players <span class="t">how many handed</span></span><span class="val" id="pv"></span></div>
 <div class="bar"><div class="band"></div><input type="range" min="2" max="9" step="1" id="players"></div></div>
+<div class="m" style="border:0;padding-top:0"><div class="mh"><span>Effective stack <span class="t">big blinds</span></span><span class="val" id="sv"></span></div>
+<div class="bar"><div class="band"></div><input type="range" min="0" max="13" step="1" id="stack"></div></div>
 <div class="score"><div><b id="inr">0/0</b> in target</div><div class="sub" id="miss"></div></div>
 <div id="list"></div>
 <textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
@@ -65,7 +67,11 @@ const KEY="statCheck.v1";
 let CUR={game:"PLO5",players:8};
 const MULT={9:1,8:1.06,7:1.15,6:1.3,5:1.45,4:1.65,3:2,2:3};
 const BASE={"PLO5":1.1,"Hold'em":1};
-function tgt(m){if(!m[6])return[m[4],m[5]];const g=(typeof st!=="undefined"&&st)?st:CUR;const k=MULT[g.players||(g.game==="PLO5"?8:9)]/BASE[g.game];
+const PLO_MULT={9:1,8:1,7:1.19,6:1.19,5:1.35,4:1.58,3:1.82,2:2.37};
+const PLO_VPIP={9:[25,32],8:[25,32],7:[30,38],6:[30,38],5:[35,42],4:[40,50],3:[48,60],2:[60,75]};
+function tgt(m){const G=(typeof st!=="undefined"&&st)?st:CUR;const n=G.players||(G.game==="PLO5"?8:9);
+ if(G.game==="PLO5"){const bb=G.stack||100;if(m[0]==="3-bet"&&bb<50)return[10,12];if(m[0]==="3-bet"&&bb>=200)return[5,8];if(m[0]==="VPIP")return PLO_VPIP[n];if(m[0]==="WTSD"&&n<=5)return[26,30];
+  if(m[6]){const k=PLO_MULT[n];return[Math.round(m[4]*k),Math.min(m[3],Math.round(m[5]*k))]}return[m[4],m[5]]}if(!m[6])return[m[4],m[5]];const g=(typeof st!=="undefined"&&st)?st:CUR;const k=MULT[g.players||(g.game==="PLO5"?8:9)]/BASE[g.game];
  return[Math.min(m[3],Math.round(m[4]*k)),Math.min(m[3],Math.round(m[5]*k))]}
 const nowLocal=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
 const mid=m=>{const[a,b]=tgt(m);return Math.round((a+b)/2)};
@@ -99,6 +105,11 @@ if(!st.players)st.players=st.game==="PLO5"?8:9;
 const pl=document.getElementById("players"),pv=document.getElementById("pv");
 const syncP=()=>{pl.value=st.players;pv.textContent=st.players+"-handed"};syncP();
 pl.addEventListener("input",()=>{st.players=+pl.value;syncP();build()});
+const STK=[10,20,30,40,50,75,100,150,200,250,300,400,500,750];
+if(st.stack==null)st.stack=100;
+const sk=document.getElementById("stack"),sv=document.getElementById("sv");
+const syncS=()=>{sk.value=STK.indexOf(st.stack)<0?6:STK.indexOf(st.stack);sv.textContent=st.stack+(st.stack>=750?"+":"")+" bb"};syncS();
+sk.addEventListener("input",()=>{st.stack=STK[+sk.value];syncS();build()});
 const g=document.getElementById("game");
 const syncG=()=>g.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.textContent===st.game));
 g.addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){st.game=e.target.textContent;syncG();build()}});syncG();
@@ -109,7 +120,7 @@ function toast(t){const e=document.getElementById("toast");e.textContent=t;setTi
 document.getElementById("copy").addEventListener("click",async()=>{
  const S=SETS[st.game];let ok=0;
  const lines=S.map((m,i)=>{const v=st.v[st.game][i],s=status(m,v);if(s==="ok")ok++;return `${m[0]}: ${v} (target ${tgt(m)[0]===tgt(m)[1]?tgt(m)[0]:tgt(m).join("–")})${s==="ok"?" ✓":s==="low"?" LOW":" HIGH"}`});
- const txt=`${st.game} cash stats · ${st.players}-handed\n${fmtWhen(st.when)}\n${lines.join("\n")}\nIn target: ${ok}/${S.length}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+ const txt=`${st.game} cash stats · ${st.players}-handed · ${st.stack}${st.stack>=750?"+":""}bb eff\n${fmtWhen(st.when)}\n${lines.join("\n")}\nIn target: ${ok}/${S.length}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
  try{await navigator.clipboard.writeText(txt);toast("Copied")}catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed")}t.remove()}
 });
 document.getElementById("reset").addEventListener("click",()=>{st.v[st.game]=SETS[st.game].map(mid);st.when=nowLocal();when.value=st.when;build()});
