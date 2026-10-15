@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Session Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c0e;color:#ecf0f4;font:16px -apple-system,system-ui,Segoe UI,Roboto,sans-serif;padding:16px 16px calc(24px + env(safe-area-inset-bottom));max-width:480px;margin:auto}
+h1{font-size:20px;margin-bottom:12px}
+.seg{display:flex;background:#161b20;border-radius:10px;padding:3px;margin-bottom:8px}
+.seg button{flex:1;border:0;background:none;color:#96a2ae;font-weight:600;font-size:15px;font-family:inherit;padding:9px;border-radius:8px}
+.seg button.on{background:#5ad2ff;color:#04121a}
+svg{display:block;width:100%;height:auto;margin:6px 0 4px}
+.total{text-align:center;font-size:14px;color:#96a2ae;margin-bottom:8px}
+.total b{font-size:26px;color:#ecf0f4}
+.row{display:grid;grid-template-columns:96px 1fr 34px;align-items:center;gap:8px;padding:5px 0}
+.row label{font-size:14px}
+.row output{text-align:right;font:600 15px ui-monospace,monospace}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:#2a333b;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#5ad2ff;border:0}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#5ad2ff;border:0}
+textarea{width:100%;min-height:64px;margin-top:10px;background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:10px;padding:10px;font-size:15px;font-family:inherit;resize:vertical}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btns button{flex:1;border:0;border-radius:10px;padding:13px;font-weight:600;font-size:16px;font-family:inherit}
+#copy{background:#5ad2ff;color:#04121a}#reset{background:#161b20;color:#96a2ae}
+#toast{text-align:center;color:#5ad2ff;font-size:14px;height:20px;margin-top:8px}
+</style></head><body>
+<h1>Session check</h1>
+<div class="seg" id="game"><button class="on">Hold'em</button><button>PLO</button></div>
+<div class="seg" id="fmt"><button class="on">Cash</button><button>Tournament</button></div>
+<svg id="radar" viewBox="-40 0 400 290"></svg>
+<div class="total">Average <b id="avg">70</b></div>
+<div id="rows"></div>
+<textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
+<div class="btns"><button id="reset">Reset</button><button id="copy">Copy for chat</button></div>
+<div id="toast"></div>
+<script>
+const AX=["Focus","In control","Discipline","Alertness","Decisions"];
+const KEY="sessionCheck.v2";
+let st={game:"Hold'em",fmt:"Cash",v:AX.map(()=>70),note:""};
+try{Object.assign(st,JSON.parse(localStorage.getItem(KEY))||{})}catch(e){}
+const rows=document.getElementById("rows"),svg=document.getElementById("radar");
+const C=[160,148],R=100,N=AX.length;
+const pt=(i,r)=>{const a=-Math.PI/2+i*2*Math.PI/N;return[C[0]+r*Math.cos(a),C[1]+r*Math.sin(a)]};
+function color(v){return v<50?"#ff6464":v<70?"#ffbe50":"#5ad2ff"}
+function draw(){
+  let s="";
+  [25,50,75,100].forEach(l=>{s+=`<polygon points="${AX.map((_,i)=>pt(i,R*l/100).join(",")).join(" ")}" fill="none" stroke="#2a333b"/>`});
+  AX.forEach((n,i)=>{const[x,y]=pt(i,R);s+=`<line x1="${C[0]}" y1="${C[1]}" x2="${x}" y2="${y}" stroke="#2a333b"/>`;
+    const[lx,ly]=pt(i,R+22);const anc=Math.abs(lx-C[0])<5?"middle":lx<C[0]?"end":"start";
+    s+=`<text x="${lx}" y="${ly+4}" fill="#96a2ae" font-size="13" text-anchor="${anc}">${n}</text><text x="${lx}" y="${ly+20}" fill="#ecf0f4" font-size="14" font-weight="700" text-anchor="${anc}">${st.v[i]}</text>`});
+  const avg=Math.round(st.v.reduce((a,b)=>a+b,0)/N),col=color(avg);
+  s+=`<polygon points="${st.v.map((v,i)=>pt(i,R*v/100).join(",")).join(" ")}" fill="${col}33" stroke="${col}" stroke-width="2"/>`;
+  st.v.forEach((v,i)=>{const[x,y]=pt(i,R*v/100);s+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${col}"/>`});
+  svg.innerHTML=s;document.getElementById("avg").textContent=avg;
+  localStorage.setItem(KEY,JSON.stringify(st));
+}
+AX.forEach((n,i)=>{
+  const d=document.createElement("div");d.className="row";
+  d.innerHTML=`<label for="s${i}">${n}</label><input id="s${i}" type="range" min="0" max="100" step="1" value="${st.v[i]}"><output id="o${i}">${st.v[i]}</output>`;
+  rows.appendChild(d);
+  const inp=d.querySelector("input"),out=d.querySelector("output");
+  inp.addEventListener("input",()=>{st.v[i]=+inp.value;out.textContent=inp.value;draw()});
+});
+function seg(id,key){const el=document.getElementById(id);
+  const sync=()=>el.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.textContent===st[key]));
+  el.addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){st[key]=e.target.textContent;sync();draw()}});sync()}
+seg("game","game");seg("fmt","fmt");
+const note=document.getElementById("note");note.value=st.note;note.addEventListener("input",()=>{st.note=note.value;draw()});
+function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
+document.getElementById("copy").addEventListener("click",async()=>{
+  const txt=`${st.game} · ${st.fmt}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+  try{await navigator.clipboard.writeText(txt);toast("Copied")}
+  catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();
+    try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed. Long-press to copy.")}t.remove()}
+});
+document.getElementById("reset").addEventListener("click",()=>{st.v=AX.map(()=>70);st.note="";note.value="";
+  AX.forEach((_,i)=>{document.getElementById("s"+i).value=70;document.getElementById("o"+i).textContent=70});draw()});
+draw();
+</script></body></html>
