@@ -33,14 +33,14 @@ textarea{width:100%;min-height:64px;margin-top:10px;background:#161b20;color:#ec
 #toast{text-align:center;color:#5ad2ff;font-size:14px;height:20px;margin-top:8px}
 </style></head><body>
 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><h1 style="margin:0">Session check</h1><a href="stats.html" style="color:#5ad2ff;font-size:14px">Stat check →</a></div>
-<div class="rule" role="note"><h2>Standing rules</h2><ul><li>Never bluff known pros.</li><li>Don't bluff players who know you. Your reputation is your edge.</li><li>Stay disciplined.</li></ul><small>From $5K Challenge bust, 20 Oct 2026.</small></div>
+<div class="rule" id="ruleBox" role="note"><h2>Tournament rules</h2><ul><li>Never bluff known pros.</li><li>Don't bluff players who know you. Your reputation is your edge.</li><li>Stay disciplined.</li></ul><small>From $5K Challenge bust, 20 Oct 2026.</small></div>
 <div class="seg" id="game"><button class="on">Hold'em</button><button>PLO</button></div>
 <div class="seg" id="fmt"><button class="on">Cash</button><button>Tournament</button></div>
 <svg id="radar" viewBox="-40 0 400 290"></svg>
 <div class="total">Total <b id="tot">350</b><span style="color:#96a2ae">/500</span> &nbsp;·&nbsp; Average <b id="avg">70</b></div>
 <div class="row" style="grid-template-columns:96px 1fr"><label for="when">Time</label><input id="when" type="datetime-local" style="background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:8px;padding:8px;font-size:15px;font-family:inherit;width:100%"></div>
 <div id="rows"></div>
-<label class="chk"><input type="checkbox" id="nobluff"><span>No bluffs vs pros / players who know me</span></label>
+<label class="chk" id="nbRow"><input type="checkbox" id="nobluff"><span>No bluffs vs pros / players who know me</span></label>
 <textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
 <div class="btns"><button id="reset">Reset</button><button id="copy">Copy for chat</button></div>
 <div id="toast"></div>
@@ -53,7 +53,7 @@ const rows=document.getElementById("rows"),svg=document.getElementById("radar");
 const C=[160,148],R=100,N=AX.length;
 const pt=(i,r)=>{const a=-Math.PI/2+i*2*Math.PI/N;return[C[0]+r*Math.cos(a),C[1]+r*Math.sin(a)]};
 function color(v){return v<50?"#ff6464":v<70?"#ffbe50":"#5ad2ff"}
-function draw(){
+function draw(){const T=st.fmt==="Tournament";document.getElementById("ruleBox").style.display=T?"":"none";document.getElementById("nbRow").style.display=T?"":"none";
   let s="";
   [25,50,75,100].forEach(l=>{s+=`<polygon points="${AX.map((_,i)=>pt(i,R*l/100).join(",")).join(" ")}" fill="none" stroke="#2a333b"/>`});
   AX.forEach((n,i)=>{const[x,y]=pt(i,R);s+=`<line x1="${C[0]}" y1="${C[1]}" x2="${x}" y2="${y}" stroke="#2a333b"/>`;
@@ -84,7 +84,7 @@ const note=document.getElementById("note");note.value=st.note;note.addEventListe
 const nb=document.getElementById("nobluff");nb.checked=!!st.noBluff;nb.addEventListener("change",()=>{st.noBluff=nb.checked;draw()});
 function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
 document.getElementById("copy").addEventListener("click",async()=>{
-  const tot=st.v.reduce((a,b)=>a+b,0);const txt=`${st.game} · ${st.fmt}\n${fmtWhen(st.when)}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+`\nTotal: ${tot}/500 (avg ${Math.round(tot/5)})`+`\nNo bluffs vs pros/players who know me: ${st.noBluff?"✓ yes":"✗ no"}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+  const tot=st.v.reduce((a,b)=>a+b,0);const txt=`${st.game} · ${st.fmt}\n${fmtWhen(st.when)}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+`\nTotal: ${tot}/500 (avg ${Math.round(tot/5)})`+(st.fmt==="Tournament"?`\nNo bluffs vs pros/players who know me: ${st.noBluff?"✓ yes":"✗ no"}`:"")+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
   try{await navigator.clipboard.writeText(txt);toast("Copied")}
   catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();
     try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed. Long-press to copy.")}t.remove()}
