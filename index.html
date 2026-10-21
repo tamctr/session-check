@@ -23,22 +23,31 @@ textarea{width:100%;min-height:64px;margin-top:10px;background:#161b20;color:#ec
 .btns{display:flex;gap:8px;margin-top:12px}
 .btns button{flex:1;border:0;border-radius:10px;padding:13px;font-weight:600;font-size:16px;font-family:inherit}
 #copy{background:#5ad2ff;color:#04121a}#reset{background:#161b20;color:#96a2ae}
+.rule{background:#1a1408;border:1px solid #6b4f12;border-left:4px solid #ffbe50;border-radius:10px;padding:9px 12px 8px;margin-bottom:10px}
+.rule h2{font-size:13px;font-weight:700;color:#ffbe50;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.rule ul{list-style:none;font-size:14px;line-height:1.4}
+.rule li{padding-left:14px;position:relative}.rule li:before{content:"•";position:absolute;left:2px;color:#ffbe50}
+.rule small{display:block;font-size:11px;color:#96a2ae;margin-top:4px}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-top:8px;background:#161b20;border:1px solid #2a333b;border-radius:10px;font-size:15px;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:#5ad2ff;flex:none}
 #toast{text-align:center;color:#5ad2ff;font-size:14px;height:20px;margin-top:8px}
 </style></head><body>
 <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><h1 style="margin:0">Session check</h1><a href="stats.html" style="color:#5ad2ff;font-size:14px">Stat check →</a></div>
+<div class="rule" role="note"><h2>Standing rules</h2><ul><li>Never bluff known pros.</li><li>Don't bluff players who know you. Your reputation is your edge.</li><li>Stay disciplined.</li></ul><small>From $5K Challenge bust, 20 Oct 2026.</small></div>
 <div class="seg" id="game"><button class="on">Hold'em</button><button>PLO</button></div>
 <div class="seg" id="fmt"><button class="on">Cash</button><button>Tournament</button></div>
 <svg id="radar" viewBox="-40 0 400 290"></svg>
 <div class="total">Total <b id="tot">350</b><span style="color:#96a2ae">/500</span> &nbsp;·&nbsp; Average <b id="avg">70</b></div>
 <div class="row" style="grid-template-columns:96px 1fr"><label for="when">Time</label><input id="when" type="datetime-local" style="background:#161b20;color:#ecf0f4;border:1px solid #2a333b;border-radius:8px;padding:8px;font-size:15px;font-family:inherit;width:100%"></div>
 <div id="rows"></div>
+<label class="chk"><input type="checkbox" id="nobluff"><span>No bluffs vs pros / players who know me</span></label>
 <textarea id="note" placeholder="Notes: key hands, what to fix…"></textarea>
 <div class="btns"><button id="reset">Reset</button><button id="copy">Copy for chat</button></div>
 <div id="toast"></div>
 <script>
 const AX=["Focus","In control","Discipline","Alertness","Decisions"];
 const KEY="sessionCheck.v2";
-let st={game:"Hold'em",fmt:"Cash",v:AX.map(()=>70),note:""};
+let st={game:"Hold'em",fmt:"Cash",v:AX.map(()=>70),note:"",noBluff:false};
 try{Object.assign(st,JSON.parse(localStorage.getItem(KEY))||{})}catch(e){}
 const rows=document.getElementById("rows"),svg=document.getElementById("radar");
 const C=[160,148],R=100,N=AX.length;
@@ -72,14 +81,15 @@ const when=document.getElementById("when");when.value=st.when||nowLocal();st.whe
 when.addEventListener("input",()=>{st.when=when.value;draw()});
 const fmtWhen=v=>{if(!v)return"";const d=new Date(v);return d.toLocaleString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"})};
 const note=document.getElementById("note");note.value=st.note;note.addEventListener("input",()=>{st.note=note.value;draw()});
+const nb=document.getElementById("nobluff");nb.checked=!!st.noBluff;nb.addEventListener("change",()=>{st.noBluff=nb.checked;draw()});
 function toast(t){const e=document.getElementById("toast");e.textContent=t;setTimeout(()=>e.textContent="",2000)}
 document.getElementById("copy").addEventListener("click",async()=>{
-  const tot=st.v.reduce((a,b)=>a+b,0);const txt=`${st.game} · ${st.fmt}\n${fmtWhen(st.when)}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+`\nTotal: ${tot}/500 (avg ${Math.round(tot/5)})`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
+  const tot=st.v.reduce((a,b)=>a+b,0);const txt=`${st.game} · ${st.fmt}\n${fmtWhen(st.when)}\n`+AX.map((n,i)=>`${n}: ${st.v[i]}`).join("\n")+`\nTotal: ${tot}/500 (avg ${Math.round(tot/5)})`+`\nNo bluffs vs pros/players who know me: ${st.noBluff?"✓ yes":"✗ no"}`+(st.note.trim()?`\nNotes: ${st.note.trim()}`:"");
   try{await navigator.clipboard.writeText(txt);toast("Copied")}
   catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();
     try{document.execCommand("copy");toast("Copied")}catch(_){toast("Copy failed. Long-press to copy.")}t.remove()}
 });
-document.getElementById("reset").addEventListener("click",()=>{st.v=AX.map(()=>70);st.note="";note.value="";st.when=nowLocal();when.value=st.when;
+document.getElementById("reset").addEventListener("click",()=>{st.v=AX.map(()=>70);st.note="";note.value="";st.noBluff=false;nb.checked=false;st.when=nowLocal();when.value=st.when;
   AX.forEach((_,i)=>{document.getElementById("s"+i).value=70;document.getElementById("o"+i).textContent=70});draw()});
 draw();
 </script></body></html>
